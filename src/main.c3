@@ -23,7 +23,9 @@ fn int main(String[] args)
 	// mpv::command(mpv, {"loadfile", args[1]})!!;
 	mpv::load_file(mpv, args[1])!!;
 
-	mpv.observe_property("pause", FLAG, 0)!!;
+	mpv.observe_prop("pause", FLAG, 0)!!;
+
+	io::printfn("a: %s, b: %s", mpv::api_version(), mpv.client_id());
 
 	rl::initWindow(500, 200, "Mpv client");
 	defer rl::closeWindow();

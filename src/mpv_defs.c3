@@ -1,4 +1,5 @@
 module mpv;
+import std::io;
 
 faultdef EVENT_QUEUE_FULL, NOMEM, UNINITIALIZED, INVALID_PARAMETER,
 		OPTION_NOT_FOUND, OPTION_FORMAT, OPTION_ERROR,
@@ -10,6 +11,17 @@ faultdef EVENT_QUEUE_FULL, NOMEM, UNINITIALIZED, INVALID_PARAMETER,
 typedef MpvError = CInt;
 typedef Mpv = void*;
 typedef MpvUserdata = ulong;
+
+bitstruct MpvVersion (Printable) : CULong
+{
+	uint minor : 0..15;
+	uint major : 16..31;
+}
+
+fn usz? MpvVersion.to_format(&self, Formatter* fmt) @dynamic
+{
+	return fmt.printf("%s.%s", self.major, self.minor);
+}
 
 struct MpvNode
 {
