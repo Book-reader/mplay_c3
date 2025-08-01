@@ -62,7 +62,7 @@ extern fn MpvError mpv_get_property(Mpv ctx, ZString name, MpvFormat format, voi
 extern fn ZString mpv_get_property_string(Mpv ctx, ZString name);
 // Wrapped
 extern fn ZString mpv_get_property_osd_string(Mpv ctx, ZString name);
-
+// Wrapped, tested
 extern fn MpvError mpv_get_property_async(Mpv ctx, MpvUserdata reply_userdata, ZString name, MpvFormat format);
 // Wrapped, tested
 extern fn MpvError mpv_observe_property(Mpv mpv, MpvUserdata reply_userdata, ZString name, MpvFormat format);

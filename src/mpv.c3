@@ -231,6 +231,12 @@ fn void? Mpv.get_prop(self, String prop, MpvFormat format, void* data) => @pool(
 }
 
 
+// Reading properties asynchronously
+fn void? Mpv.get_prop_async(self, MpvUserdata reply_userdata, String prop, MpvFormat format) => @pool()
+{
+	return wrap_err(mpv_get_property_async(self, reply_userdata, prop.zstr_tcopy(), format));
+}
+
 // Other methods
 fn String MpvEvent.name(&self) => mpv_event_name(self.event_id).str_view();
 
