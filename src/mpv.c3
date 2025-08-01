@@ -53,6 +53,9 @@ fn void? load_file(Mpv ctx, String file_name) => command(ctx, {"loadfile", file_
 
 fn void? load_playlist(Mpv ctx, String file_name, bool replace) => command(ctx, {"loadlist", file_name, replace ? "replace" : "append"});
 
+fn void? shuffle(Mpv ctx) => command(ctx, {"playlist-shuffle"});
+fn void? unshuffle(Mpv ctx) => command(ctx, {"playlist-unshuffle"});
+
 fn void? command(Mpv ctx, String[] args) => @pool()
 {
 	return wrap_err(mpv_command(ctx, to_zstr_slice(args)));
@@ -110,6 +113,7 @@ fn long Mpv.get_time_ns(self) => mpv_get_time_ns(self);
 
 fn long Mpv.get_time_us(self) => mpv_get_time_us(self);
 
+fn void? Mpv.set_song_idx(Mpv ctx, long idx) => ctx.set_prop_int("playlist-pos", idx);
 
 // Setting options
 fn void? Mpv.set_option_string(self, String option, String value) => @pool()

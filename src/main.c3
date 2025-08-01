@@ -71,7 +71,13 @@ fn int main(String[] args)
 		}
 		if (rl::isKeyPressed(rl::KEY_A))
 		{
-			mpv.set_prop_flag("pause", false)!!;
+			mpv::shuffle(mpv)!!;
+			mpv.set_song_idx(0)!!;
+		}
+		if (rl::isKeyPressed(rl::KEY_B))
+		{
+			mpv::unshuffle(mpv)!!;
+			mpv.set_song_idx(0)!!;
 		}
 		if (rl::isKeyPressed(rl::KEY_M))
 		{
