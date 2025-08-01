@@ -113,7 +113,11 @@ fn long Mpv.get_time_ns(self) => mpv_get_time_ns(self);
 
 fn long Mpv.get_time_us(self) => mpv_get_time_us(self);
 
-fn void? Mpv.set_song_idx(Mpv ctx, long idx) => ctx.set_prop_int("playlist-pos", idx);
+fn void? Mpv.set_song_idx(self, long idx) => self.set_prop_int("playlist-pos", idx);
+
+fn void? Mpv.pause(self) => self.set_prop_flag("pause", true);
+
+fn void? Mpv.unpause(self) => self.set_prop_flag("pause", false);
 
 // Setting options
 fn void? Mpv.set_option_string(self, String option, String value) => @pool()
@@ -244,19 +248,26 @@ fn void? Mpv.get_prop_async(self, MpvUserdata reply_userdata, String prop, MpvFo
 // Other methods
 fn String MpvEvent.name(&self) => mpv_event_name(self.event_id).str_view();
 
-/*	 *  MPV_EVENT_GET_PROPERTY_REPLY:     MpvEventProperty*
-	 *  MPV_EVENT_PROPERTY_CHANGE:        MpvEventProperty*
-	 *  MPV_EVENT_LOG_MESSAGE:            MpvEventLogMessage*
-	 *  MPV_EVENT_CLIENT_MESSAGE:         MpvEventClientMessage*
-	 *  MPV_EVENT_START_FILE:             MpvEventStartFile* (since v1.108)
-	 *  MPV_EVENT_END_FILE:               MpvEventEndFile*
-	 *  MPV_EVENT_HOOK:                   MpvEventHook*
-	 *  MPV_EVENT_COMMAND_REPLY*          MpvEventCommand*
-	 *  other: NULL*/
-<*
- @require self.event_id == PROPERTY_CHANGE
-*>
+<* @require self.event_id == GET_PROPERTY_REPLY *>
+fn MpvEventProperty* MpvEvent.get_property_reply(&self) => self.data;
+
+<* @require self.event_id == PROPERTY_CHANGE *>
 fn MpvEventProperty* MpvEvent.get_property_change(&self) => self.data;
+
+<* @require self.event_id == LOG_MESSAGE *>
+fn MpvEventLogMessage* MpvEvent.get_log_message(&self) => self.data;
+
+<* @require self.event_id == START_FILE *>
+fn MpvEventStartFile* MpvEvent.get_start_file(&self) => self.data;
+
+<* @require self.event_id == END_FILE *>
+fn MpvEventEndFile* MpvEvent.get_end_file(&self) => self.data;
+
+<* @require self.event_id == HOOK *>
+fn MpvEventHook* MpvEvent.get_hook(&self) => self.data;
+
+<* @require self.event_id == COMMAND_REPLY *>
+fn MpvEventCommand* MpvEvent.get_command_reply(&self) => self.data;
 
 fn void MpvNode.free_contents(&self) => mpv_free_node_contents(self);
 
