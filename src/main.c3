@@ -4,6 +4,7 @@ import raylib5::rl;
 import std::io;
 import std::time;
 
+// this is not well made, but works as an example
 fn int main(String[] args)
 {
 	Mpv mpv = mpv::create();
