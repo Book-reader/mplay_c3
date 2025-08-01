@@ -10,6 +10,13 @@
 		devShells.${builtins.currentSystem}.default = pkgs.mkShellNoCC {
 			packages = with pkgs; [ gcc gnumake valgrind gdb inputs.c3c.packages.${builtins.currentSystem}.default ];
 			buildInputs = with pkgs; [ mpv-unwrapped ];
+			LD_LIBRARY_PATH = with pkgs; ''$LD_LIBRARY_PATH:${
+				lib.makeLibraryPath [
+					libGL
+					xorg.libX11
+				]
+			}'';
+
 		};
 	};
 }

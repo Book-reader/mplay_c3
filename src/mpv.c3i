@@ -28,7 +28,7 @@ extern fn long mpv_get_time_ns(Mpv ctx);
 
 extern fn long mpv_get_time_us(Mpv ctx);
 
-extern fn void mpv_free_node_contents(MpvNode node);
+extern fn void mpv_free_node_contents(MpvNode* node);
 
 extern fn MpvError mpv_set_option(Mpv ctx, ZString name, MpvFormat format, void* data);
 
@@ -36,15 +36,15 @@ extern fn MpvError mpv_set_option_string(Mpv ctx, ZString name, ZString data);
 
 extern fn MpvError mpv_command(Mpv ctx, ZString* args);
 
-extern fn MpvError mpv_command_node(Mpv ctx, MpvNode args, MpvNode result);
+extern fn MpvError mpv_command_node(Mpv ctx, MpvNode* args, MpvNode* result);
 
-extern fn MpvError mpv_command_ret(Mpv ctx, ZString* args, MpvNode result);
+extern fn MpvError mpv_command_ret(Mpv ctx, ZString* args, MpvNode* result);
 
 extern fn MpvError mpv_command_string(Mpv ctx, ZString* args);
 
 extern fn MpvError mpv_command_async(Mpv ctx, MpvUserdata reply_userdata, ZString* args);
 
-extern fn MpvError mpv_command_node_async(Mpv ctx, MpvUserdata reply_userdata, MpvNode args);
+extern fn MpvError mpv_command_node_async(Mpv ctx, MpvUserdata reply_userdata, MpvNode* args);
 
 extern fn void mpv_abort_async_command(Mpv ctx, MpvUserdata reply_userdata);
 
@@ -60,19 +60,17 @@ extern fn MpvError mpv_get_property(Mpv ctx, ZString name, MpvFormat format, voi
 
 extern fn ZString mpv_get_property_string(Mpv ctx, ZString name);
 
-// TODO: check what OSD string is and make sure it isn't WString or something
 extern fn ZString mpv_get_property_osd_string(Mpv ctx, ZString name);
 
 extern fn MpvError mpv_get_property_async(Mpv ctx, MpvUserdata reply_userdata, ZString name, MpvFormat format);
 
 extern fn MpvError mpv_observe_property(Mpv mpv, MpvUserdata reply_userdata, ZString name, MpvFormat format);
 
-// TODO: this returns a positive value on non error, handle properly
 extern fn MpvError mpv_unobserve_property(Mpv mpv, MpvUserdata registered_reply_userdata);
 
 extern fn ZString mpv_event_name(MpvEventId event);
 
-extern fn MpvError mpv_event_to_node(MpvNode dst, MpvEvent* src);
+extern fn MpvError mpv_event_to_node(MpvNode* dst, MpvEvent* src);
 
 extern fn MpvError mpv_request_event(Mpv ctx, MpvEventId event, MpvBool enable);
 

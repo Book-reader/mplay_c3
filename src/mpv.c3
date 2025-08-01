@@ -1,141 +1,124 @@
 module mpv;
 
-faultdef EVENT_QUEUE_FULL, NOMEM, UNINITIALIZED, INVALID_PARAMETER,
-		OPTION_NOT_FOUND, OPTION_FORMAT, OPTION_ERROR,
-		PROPERTY_NOT_FOUND, PROPERTY_FORMAT, PROPERTY_UNAVAILABLE,
-		PROPERTY_ERROR, COMMAND, LOADING_FAILED, AO_INIT_FAILED,
-		VO_INIT_FAILED, NOTHING_TO_PLAY, UNKNOWN_FORMAT, UNSUPPORTED,
-		NOT_IMPLEMENTED, GENERIC;
+fn Mpv create() => mpv_create();
 
-typedef MpvError = CInt;
-typedef Mpv = void*;
-typedef MpvNode = void*;
-typedef MpvNodeList = void*;
-typedef MpvByteArray = void*;
-typedef MpvUserdata = ulong;
-// typedef MpvEvent = void*;
+fn void free(void* data) => mpv_free(data);
 
-struct MpvEvent
+fn void? command(Mpv mpv, String[] args) => @pool()
 {
-	MpvEventId event_id;
-	MpvError error;
-	MpvUserdata reply_userdata;
-	void *data;
-}
-
-alias MpvCallback = fn void(void*);
-
-enum MpvBool : CInt
-{
-	FALSE,
-	TRUE,
-}
-
-enum MpvFormat : CInt
-{
-	NONE,
-	STRING,
-	OSD_STRING,
-	FLAG,
-	INT64,
-	DOUBLE,
-	NODE,
-	NODE_ARRAY,
-	NODE_MAP,
-	BYTE_ARRAY,
-}
-
-macro void? wrap_err(MpvError val) @private
-{
-	switch (val)
+	ZString[] argsz = mem::temp_array(ZString, args.len + 1);
+	foreach (i, arg : args)
 	{
-		case 0: return;
-		case -1: return EVENT_QUEUE_FULL?;
-		case -2: return NOMEM?;
-		case -3: return UNINITIALIZED?;
-		case -4: return INVALID_PARAMETER?;
-		case -5: return OPTION_NOT_FOUND?;
-		case -6: return OPTION_FORMAT?;
-		case -7: return OPTION_ERROR?;
-		case -8: return PROPERTY_NOT_FOUND?;
-		case -9: return PROPERTY_FORMAT?;
-		case -10: return PROPERTY_UNAVAILABLE?;
-		case -11: return PROPERTY_ERROR?;
-		case -12: return COMMAND?;
-		case -13: return LOADING_FAILED?;
-		case -14: return AO_INIT_FAILED?;
-		case -15: return VO_INIT_FAILED?;
-		case -16: return NOTHING_TO_PLAY?;
-		case -17: return UNKNOWN_FORMAT?;
-		case -18: return UNSUPPORTED?;
-		case -19: return NOT_IMPLEMENTED?;
-		case -20: return GENERIC?;
-		default:
-			unreachable("Invalid MPV error code");
+		argsz[i] = arg.zstr_tcopy();
 	}
+	argsz[^1] = null;
+
+	wrap_err(mpv_command(mpv, argsz))!;
 }
 
-fn ZString error_string(fault err) @inline
+fn void? load_file(Mpv mpv, String filename) => command(mpv, { "loadfile", filename });
+
+fn MpvEvent* wait_event(Mpv mpv, double timeout) => mpv_wait_event(mpv, timeout);
+
+// Mpv methods
+fn void? Mpv.init(self)
 {
-	MpvError err_val;
-	switch (err)
-	{
-		case EVENT_QUEUE_FULL: err_val = -1;
-		case NOMEM: err_val = -2;
-		case UNINITIALIZED: err_val = -3;
-		case INVALID_PARAMETER: err_val = -4;
-		case OPTION_NOT_FOUND: err_val = -5;
-		case OPTION_FORMAT: err_val = -6;
-		case OPTION_ERROR: err_val = -7;
-		case PROPERTY_NOT_FOUND: err_val = -8;
-		case PROPERTY_FORMAT: err_val = -9;
-		case PROPERTY_UNAVAILABLE: err_val = -10;
-		case PROPERTY_ERROR: err_val = -11;
-		case COMMAND: err_val = -12;
-		case LOADING_FAILED: err_val = -13;
-		case AO_INIT_FAILED: err_val = -14;
-		case VO_INIT_FAILED: err_val = -15;
-		case NOTHING_TO_PLAY: err_val = -16;
-		case UNKNOWN_FORMAT: err_val = -17;
-		case UNSUPPORTED: err_val = -18;
-		case NOT_IMPLEMENTED: err_val = -19;
-		case GENERIC: err_val = -20;
-		default:
-			unreachable("Not an MPV error: %s", err);
-	}
-	return mpv_error_string(err_val);
+	wrap_err(mpv_initialize(self))!;
 }
 
-enum MpvEventId : const CInt
+fn void Mpv.destroy(self) => mpv_terminate_destroy(self);
+
+fn void? Mpv.set_option_string(self, String option, String value) => @pool()
 {
-    NONE = 0,
-    SHUTDOWN,
-    LOG_MESSAGE,
-    GET_PROPERTY_REPLY,
-    SET_PROPERTY_REPLY,
-    COMMAND_REPLY,
-    START_FILE,
-    END_FILE,
-    FILE_LOADED,
-    CLIENT_MESSAGE = 16,
-    VIDEO_RECONFIG,
-    AUDIO_RECONFIG,
-    SEEK = 20,
-    PLAYBACK_RESTART,
-    PROPERTY_CHANGE,
-    QUEUE_OVERFLOW = 24,
-    HOOK
+	return self.set_option(option, STRING, &&value.zstr_tcopy());
 }
 
-enum MpvLogLevel : const CInt
+fn void? Mpv.set_option_flag(self, String option, bool value) => self.set_option(option, FLAG, &&bool_to_mpv(value));
+
+fn void? Mpv.set_option_int(self, String option, long value) => self.set_option(option, INT64, &value);
+
+fn void? Mpv.set_option_double(self, String option, double value) => self.set_option(option, DOUBLE, &value);
+
+fn void? Mpv.set_option_byte_array(self, String option, char[] value) => self.set_option(option, BYTE_ARRAY, &&(MpvByteArray){value.ptr, value.len});
+
+fn void? Mpv.set_option(self, String option, MpvFormat format, void* value) => @pool()
 {
-    NONE  = 0,
-    FATAL = 10,
-    ERROR = 20,
-    WARN  = 30,
-    INFO  = 40,
-    V     = 50,
-    DEBUG = 60,
-    TRACE = 70,
+	wrap_err(mpv_set_option(self, option.zstr_tcopy(), format, value))!;
 }
 
+fn void? Mpv.set_prop_flag(self, String prop, bool value) => self.set_prop(prop, FLAG, &&bool_to_mpv(value));
+
+fn void? Mpv.set_prop_int(self, String prop, long value) => self.set_prop(prop, INT64, &value);
+
+fn void? Mpv.set_prop_double(self, String prop, double value) => self.set_prop(prop, DOUBLE, &value);
+
+fn void? Mpv.set_prop_byte_array(self, String prop, char[] value) => self.set_prop(prop, BYTE_ARRAY, &&(MpvByteArray){value.ptr, value.len});
+
+fn void? Mpv.set_prop(self, String prop, MpvFormat format, void* value) => @pool()
+{
+	wrap_err(mpv_set_property(self, prop.zstr_tcopy(), format, value))!;
+}
+
+fn void? Mpv.observe_property(self, String prop, MpvFormat format, MpvUserdata reply_userdata) => @pool()
+{
+	wrap_err(mpv_observe_property(self, reply_userdata, prop.zstr_tcopy(), format))!;
+}
+
+fn CInt? Mpv.unobserve_property(self, MpvUserdata registered_reply_userdata)
+{
+	MpvError ret = mpv_unobserve_property(self, registered_reply_userdata);
+	return ret < 0 ? @catch(wrap_err(ret))? : (CInt)ret;
+}
+
+fn bool? Mpv.get_prop_flag(self, String prop)
+{
+	MpvBool b;
+	self.get_prop(prop, FLAG, &b)!;
+	return b.as_bool;
+}
+
+fn long? Mpv.get_prop_int(self, String prop)
+{
+	long l;
+	self.get_prop(prop, INT64, &l)!;
+	return l;
+}
+
+fn double? Mpv.get_prop_double(self, String prop)
+{
+	double d;
+	self.get_prop(prop, DOUBLE, &d)!;
+	return d;
+}
+
+fn String? Mpv.get_prop_string(self, String prop)
+{
+	ZString z;
+	self.get_prop(prop, STRING, &z)!;
+	return z.str_view();
+}
+
+fn void? Mpv.get_prop(self, String prop, MpvFormat format, void* data) => @pool()
+{
+	wrap_err(mpv_get_property(self, prop.zstr_tcopy(), format, data))!;
+}
+
+fn void? Mpv.pause(self) => self.set_prop_flag("pause", true);
+fn void? Mpv.unpause(self) => self.set_prop_flag("pause", false);
+
+// Other methods
+fn String MpvEvent.name(&self) => mpv_event_name(self.event_id).str_view();
+
+/*	 *  MPV_EVENT_GET_PROPERTY_REPLY:     MpvEventProperty*
+	 *  MPV_EVENT_PROPERTY_CHANGE:        MpvEventProperty*
+	 *  MPV_EVENT_LOG_MESSAGE:            MpvEventLogMessage*
+	 *  MPV_EVENT_CLIENT_MESSAGE:         MpvEventClientMessage*
+	 *  MPV_EVENT_START_FILE:             MpvEventStartFile* (since v1.108)
+	 *  MPV_EVENT_END_FILE:               MpvEventEndFile*
+	 *  MPV_EVENT_HOOK:                   MpvEventHook*
+	 *  MPV_EVENT_COMMAND_REPLY*          MpvEventCommand*
+	 *  other: NULL*/
+<*
+ @require self.event_id == PROPERTY_CHANGE
+*>
+fn MpvEventProperty* MpvEvent.get_property_change(&self) => self.data;

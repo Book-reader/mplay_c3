@@ -1,28 +1,135 @@
 module mplay_c3;
 import mpv @public;
+import raylib5::rl;
 import std::io;
+import std::time;
 
 fn int main(String[] args)
 {
-	Mpv ctx = mpv::mpv_create();
-	defer mpv::mpv_terminate_destroy(ctx);
-	// mpv::mpv_set_property(ctx, "video", FLAG, &&MpvBool.FALSE);
-	mpv::mpv_set_option_string(ctx, "input-default-bindings", "yes");
-	mpv::mpv_set_option_string(ctx, "input-vo-keyboard", "yes");
-	MpvBool val = TRUE;
-	mpv::mpv_set_option(ctx, "osc", FLAG, &val);
+	Mpv mpv = mpv::create();
+	defer mpv.destroy();
 
-	mpv::mpv_initialize(ctx);
+	// mpv.set_option("video", FLAG, &&MpvBool.FALSE);
+	mpv.set_option_flag("video", false)!!;
 
-	ZString[] cmd = {"loadfile", args[1].zstr_tcopy(), null};
-	mpv::mpv_command(ctx, cmd);
+	mpv.set_option_string("input-default-bindings", "yes")!!;
+	mpv.set_option_string("input-vo-keyboard", "yes")!!;
 
-	while (true)
+	// mpv.set_option("osc", FLAG, &&MpvBool.TRUE);
+	mpv.set_option_flag("osc", true)!!;
+
+	mpv.init()!!;
+
+	// mpv::command(mpv, {"loadfile", args[1]})!!;
+	mpv::load_file(mpv, args[1])!!;
+
+	mpv.observe_property("pause", FLAG, 0)!!;
+
+	rl::initWindow(500, 200, "Mpv client");
+	defer rl::closeWindow();
+	rl::setTargetFPS(30);
+
+	while (!rl::windowShouldClose())
 	{
-		MpvEvent* event = mpv::mpv_wait_event(ctx, 10000);
-		io::printfn("event: %s\n", mpv::mpv_event_name(event.event_id));
-		if (event.event_id == SHUTDOWN) break;
+		MpvEvent* event = mpv::wait_event(mpv, 0);
+		switch (event.event_id)
+		{
+			case NONE:
+				break;
+			case SHUTDOWN:
+				break;
+			case PROPERTY_CHANGE:
+				MpvEventProperty* p = event.get_property_change();
+				// pause event only. 0 is set by observe_property call above
+				if (event.reply_userdata == 0)
+				{
+					 io::printfn("property %s changed to %s", p.name, *(MpvBool*)p.data);
+				}
+				else
+				{
+					nextcase default;
+				}
+			default:
+				io::printfn("got event %s", event.name());
+		}
+
+		if (rl::isKeyPressed(rl::KEY_SPACE))
+		{
+			mpv.toggle_pause()!!;
+		}
+		if (rl::isKeyPressed(rl::KEY_A))
+		{
+			mpv.set_prop_flag("pause", false)!!;
+		}
+		if (rl::isKeyPressed(rl::KEY_M))
+		{
+			mpv.set_prop_flag("mute", !mpv.get_prop_flag("mute"))!!;
+		}
+		if (rl::isKeyDown(rl::KEY_UP))
+		{
+			if (try vol = mpv.get_prop_int("volume") && vol < 100)
+			{
+				(void)mpv.set_prop_int("volume", vol + 5);
+			}
+		}
+		if (rl::isKeyDown(rl::KEY_DOWN))
+		{
+			if (try vol = mpv.get_prop_int("volume") && vol > 0)
+			{
+				(void)mpv.set_prop_int("volume", vol - 5);
+			}
+		}
+		if (rl::isKeyPressed(rl::KEY_RIGHT))
+		{
+			if (try sec = mpv.get_prop_int("time-pos"))
+			{
+				(void)mpv.set_prop_int("time-pos", sec + 5);
+			}
+		}
+		if (rl::isKeyPressed(rl::KEY_LEFT))
+		{
+			if (try sec = mpv.get_prop_int("time-pos"))
+			{
+				(void)mpv.set_prop_int("time-pos", sec - 5);
+			}
+		}
+		if (rl::isMouseButtonPressed(LEFT))
+		{
+			float[<2>] pos = bitcast(rl::getMousePosition(), float[<2>]);
+			if (pos.comp_lt({410, 70}) == {true, true} && pos.comp_gt({10, 50}) == {true, true})
+			{
+				(void)mpv.set_prop_int("time-pos", (long)(((pos.x - 10) / 400) * mpv.get_prop_int("duration") ?? 0));
+			}
+		}
+		rl::@drawing()
+		{
+			rl::clearBackground(rl::RAYWHITE);
+			rl::drawText(mpv.is_paused()!! ? "|>" : "||", 10, 10, 40, rl::BLACK);
+			rl::drawRectangle(10, 50, 400, 20, rl::BLACK);
+			rl::drawRectangle(12, 52, (int)(396 * (mpv.get_prop_int("percent-pos")!! / 100.0)), 16, rl::WHITE);
+			@pool()
+			{
+				String? title = mpv.get_prop_string("metadata/by-key/title");
+				defer if (try title) mpv::free(title);
+				rl::drawText((title ?? "Unknown").zstr_tcopy(), 10, 80, 40, rl::BLACK);
+
+				rl::drawText(string::tformat_zstr("%s/%s", time::sec(mpv.get_prop_int("time-pos") ?? 0).to_nano(), time::sec(mpv.get_prop_int("duration") ?? 0).to_nano()), 380, 70, 20, rl::BLACK);
+
+				if (mpv.get_prop_flag("mute") ?? false)
+				{
+					rl::drawText("Muted", 380, 20, 20, rl::BLACK);
+				}
+				else
+				{
+					rl::drawText(string::tformat_zstr("Vol: %s%%", mpv.get_prop_int("volume") ?? 0), 380, 20, 20, rl::BLACK);
+				}
+			};
+		};
 	}
 
 	return 0;
 }
+
+
+fn bool? Mpv.is_paused(self) => self.get_prop_flag("pause");
+fn void? Mpv.toggle_pause(self) => self.set_prop_flag("pause", !self.get_prop_flag("pause"))!;
