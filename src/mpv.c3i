@@ -64,11 +64,11 @@ extern fn ZString mpv_get_property_string(Mpv ctx, ZString name);
 extern fn ZString mpv_get_property_osd_string(Mpv ctx, ZString name);
 
 extern fn MpvError mpv_get_property_async(Mpv ctx, MpvUserdata reply_userdata, ZString name, MpvFormat format);
-
+// Wrapped, tested
 extern fn MpvError mpv_observe_property(Mpv mpv, MpvUserdata reply_userdata, ZString name, MpvFormat format);
-
+// Wrapped, tested
 extern fn MpvError mpv_unobserve_property(Mpv mpv, MpvUserdata registered_reply_userdata);
-
+// Wrapped, tested
 extern fn ZString mpv_event_name(MpvEventId event);
 
 extern fn MpvError mpv_event_to_node(MpvNode* dst, MpvEvent* src);
