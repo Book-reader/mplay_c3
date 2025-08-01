@@ -1,5 +1,7 @@
 module mpv;
 // See https://github.com/mpv-player/mpv/blob/master/include/mpv/client.h for documentation on each function
+// https://mpv.io/manual/stable/#properties and https://mpv.io/manual/stable/#options lists runtime options that can be set by `set_prop` and `set_option` respectively
+// https://mpv.io/manual/stable/#commands has a list of commands that can be sent by `command` and the other command functions
 macro ZString[] to_zstr_slice(String[] strs) @private
 {
 	ZString[] zstrs = mem::temp_array(ZString, strs.len + 1);
@@ -32,12 +34,29 @@ fn void? load_config_file(Mpv ctx, String file_name) => @pool()
 
 fn void free(void* data) => mpv_free(data);
 
+fn void wakeup(Mpv ctx) => mpv_wakeup(ctx);
+
+fn void set_wakeup_callback(Mpv ctx, MpvCallback callback, void* cb_data) => mpv_set_wakeup_callback(ctx, callback, cb_data);
+
+fn void wait_async_requests(Mpv ctx) => mpv_wait_async_requests(ctx);
+
+fn void? hook_add(Mpv ctx, MpvUserdata reply_userdata, String name, CInt priority) => @pool()
+{
+	return wrap_err(mpv_hook_add(ctx, reply_userdata, name.zstr_tcopy(), priority));
+}
+
+fn void? hook_continue(Mpv ctx, ulong id) => wrap_err(mpv_hook_continue(ctx, id));
+
+
+// Sending commands to MPV
+fn void? load_file(Mpv ctx, String file_name) => command(ctx, {"loadfile", file_name});
+
+fn void? load_playlist(Mpv ctx, String file_name, bool replace) => command(ctx, {"loadlist", file_name, replace ? "replace" : "append"});
+
 fn void? command(Mpv ctx, String[] args) => @pool()
 {
 	return wrap_err(mpv_command(ctx, to_zstr_slice(args)));
 }
-
-fn void? load_file(Mpv ctx, String file_name) => command(ctx, {"loadfile", file_name});
 
 fn MpvNode? command_node(Mpv ctx, MpvNode* args)
 {
@@ -72,6 +91,10 @@ fn void abort_async_command(Mpv ctx, MpvUserdata reply_userdata) => mpv_abort_as
 
 fn MpvEvent* wait_event(Mpv ctx, double timeout) => mpv_wait_event(ctx, timeout);
 
+fn void? request_event(Mpv ctx, MpvEventId event, bool enable) => wrap_err(mpv_request_event(ctx, event, bool_to_mpv(enable)));
+
+fn void? request_log_messages(Mpv ctx, MpvLogLevel min_level) => wrap_err(mpv_request_log_messages(ctx, min_level.to_zstr()));
+
 // Mpv methods
 fn void? Mpv.init(self) => wrap_err(mpv_initialize(self));
 
@@ -87,6 +110,8 @@ fn long Mpv.get_time_ns(self) => mpv_get_time_ns(self);
 
 fn long Mpv.get_time_us(self) => mpv_get_time_us(self);
 
+
+// Setting options
 fn void? Mpv.set_option_string(self, String option, String value) => @pool()
 {
 	return self.set_option(option, STRING, &&value.zstr_tcopy());
@@ -105,6 +130,25 @@ fn void? Mpv.set_option(self, String option, MpvFormat format, void* value) => @
 	return wrap_err(mpv_set_option(self, option.zstr_tcopy(), format, value));
 }
 
+
+fn void? Mpv.observe_prop(self, String prop, MpvFormat format, MpvUserdata reply_userdata) => @pool()
+{
+	return wrap_err(mpv_observe_property(self, reply_userdata, prop.zstr_tcopy(), format));
+}
+
+fn CInt? Mpv.unobserve_prop(self, MpvUserdata registered_reply_userdata)
+{
+	MpvError ret = mpv_unobserve_property(self, registered_reply_userdata);
+	return ret < 0 ? @catch(wrap_err(ret))? : (CInt)ret;
+}
+
+fn void? Mpv.del_prop(self, String name) => @pool()
+{
+	return wrap_err(mpv_del_property(self, name.zstr_tcopy()));
+}
+
+
+// Setting properties
 fn void? Mpv.set_prop_string(self, String prop, String value) => @pool()
 {
 	return self.set_prop(prop, STRING, &&value.zstr_tcopy());
@@ -123,26 +167,40 @@ fn void? Mpv.set_prop(self, String prop, MpvFormat format, void* value) => @pool
 	return wrap_err(mpv_set_property(self, prop.zstr_tcopy(), format, value));
 }
 
-fn void? Mpv.observe_prop(self, String prop, MpvFormat format, MpvUserdata reply_userdata) => @pool()
+
+// Setting properties asynchronously
+fn void? Mpv.set_prop_async_string(self, MpvUserdata reply_userdata, String prop, String value) => @pool()
 {
-	return wrap_err(mpv_observe_property(self, reply_userdata, prop.zstr_tcopy(), format));
+	return self.set_prop_async(reply_userdata, prop, STRING, &&value.zstr_tcopy());
 }
 
-fn CInt? Mpv.unobserve_prop(self, MpvUserdata registered_reply_userdata)
+fn void? Mpv.set_prop_async_flag(self, MpvUserdata reply_userdata, String prop, bool value) => self.set_prop_async(reply_userdata, prop, FLAG, &&bool_to_mpv(value));
+
+fn void? Mpv.set_prop_async_int(self, MpvUserdata reply_userdata, String prop, long value) => self.set_prop_async(reply_userdata, prop, INT64, &value);
+
+fn void? Mpv.set_prop_async_double(self, MpvUserdata reply_userdata, String prop, double value) => self.set_prop_async(reply_userdata, prop, DOUBLE, &value);
+
+fn void? Mpv.set_prop_async_byte_array(self, MpvUserdata reply_userdata, String prop, char[] value) => self.set_prop_async(reply_userdata, prop, BYTE_ARRAY, &&(MpvByteArray){value.ptr, value.len});
+
+fn void? Mpv.set_prop_async(self, MpvUserdata reply_userdata, String prop, MpvFormat format, void* data) => @pool()
 {
-	MpvError ret = mpv_unobserve_property(self, registered_reply_userdata);
-	return ret < 0 ? @catch(wrap_err(ret))? : (CInt)ret;
+	return wrap_err(mpv_set_property_async(self, reply_userdata, prop.zstr_tcopy(), format, data));
 }
 
-fn void? Mpv.del_prop(self, String name) => @pool()
-{
-	return wrap_err(mpv_del_property(self, name.zstr_tcopy()));
-}
 
+// Reading properties
+// These strings are allocated and need to be freed with mpv::free()
 fn String? Mpv.get_prop_string(self, String prop)
 {
 	ZString z;
 	self.get_prop(prop, STRING, &z)!;
+	return z.str_view();
+}
+
+fn String? Mpv.get_prop_osd_string(self, String prop)
+{
+	ZString z;
+	self.get_prop(prop, OSD_STRING, &z)!;
 	return z.str_view();
 }
 
@@ -172,6 +230,7 @@ fn void? Mpv.get_prop(self, String prop, MpvFormat format, void* data) => @pool(
 	return wrap_err(mpv_get_property(self, prop.zstr_tcopy(), format, data));
 }
 
+
 // Other methods
 fn String MpvEvent.name(&self) => mpv_event_name(self.event_id).str_view();
 
@@ -190,3 +249,10 @@ fn String MpvEvent.name(&self) => mpv_event_name(self.event_id).str_view();
 fn MpvEventProperty* MpvEvent.get_property_change(&self) => self.data;
 
 fn void MpvNode.free_contents(&self) => mpv_free_node_contents(self);
+
+fn MpvNode? MpvEvent.to_node(&self)
+{
+	MpvNode n;
+	wrap_err(mpv_event_to_node(&n, self))!;
+	return n;
+}

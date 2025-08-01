@@ -20,9 +20,18 @@ fn int main(String[] args)
 	mpv.set_option_flag("osc", true)!!;
 
 	mpv.init()!!;
+	mpv::set_wakeup_callback(mpv, &on_wakeup, null);
+	// (void)mpv::request_log_messages(mpv, V);
 
 	// mpv::command(mpv, {"loadfile", args[1]})!!;
-	mpv::load_file(mpv, args[1])!!;
+	if (args[1][^5..] == ".m3u")
+	{
+		mpv::load_playlist(mpv, args[1], true)!!;
+	}
+	else
+	{
+		mpv::load_file(mpv, args[1])!!;
+	}
 
 	mpv.observe_prop("pause", FLAG, 0)!!;
 
@@ -107,9 +116,9 @@ fn int main(String[] args)
 		rl::@drawing()
 		{
 			rl::clearBackground(rl::RAYWHITE);
-			rl::drawText(mpv.is_paused()!! ? "|>" : "||", 10, 10, 40, rl::BLACK);
+			rl::drawText((mpv.is_paused() ?? true) ? "|>" : "||", 10, 10, 40, rl::BLACK);
 			rl::drawRectangle(10, 50, 400, 20, rl::BLACK);
-			rl::drawRectangle(12, 52, (int)(396 * (mpv.get_prop_int("percent-pos")!! / 100.0)), 16, rl::WHITE);
+			rl::drawRectangle(12, 52, (int)(396 * ((mpv.get_prop_int("percent-pos") ?? 0) / 100.0)), 16, rl::WHITE);
 			@pool()
 			{
 				String? title = mpv.get_prop_string("metadata/by-key/title");
@@ -126,6 +135,7 @@ fn int main(String[] args)
 				{
 					rl::drawText(string::tformat_zstr("Vol: %s%%", mpv.get_prop_int("volume") ?? 0), 380, 20, 20, rl::BLACK);
 				}
+				rl::drawText(string::tformat_zstr("%s/%s", mpv.get_prop_int("playlist-pos-1") ?? -1, mpv.get_prop_int("playlist/count") ?? -1), 40, 20, 20, rl::BLACK);
 			};
 		};
 	}
@@ -136,3 +146,8 @@ fn int main(String[] args)
 
 fn bool? Mpv.is_paused(self) => self.get_prop_flag("pause");
 fn void? Mpv.toggle_pause(self) => self.set_prop_flag("pause", !self.get_prop_flag("pause"))!;
+
+fn void on_wakeup(void* data)
+{
+	io::printn("event callback!");
+}

@@ -215,34 +215,49 @@ fn ZString error_string(fault err) @inline
 
 enum MpvEventId : const CInt
 {
-    NONE = 0,
-    SHUTDOWN,
-    LOG_MESSAGE,
-    GET_PROPERTY_REPLY,
-    SET_PROPERTY_REPLY,
-    COMMAND_REPLY,
-    START_FILE,
-    END_FILE,
-    FILE_LOADED,
-    CLIENT_MESSAGE = 16,
-    VIDEO_RECONFIG,
-    AUDIO_RECONFIG,
-    SEEK = 20,
-    PLAYBACK_RESTART,
-    PROPERTY_CHANGE,
-    QUEUE_OVERFLOW = 24,
-    HOOK
+	NONE = 0,
+	SHUTDOWN,
+	LOG_MESSAGE,
+	GET_PROPERTY_REPLY,
+	SET_PROPERTY_REPLY,
+	COMMAND_REPLY,
+	START_FILE,
+	END_FILE,
+	FILE_LOADED,
+	CLIENT_MESSAGE = 16,
+	VIDEO_RECONFIG,
+	AUDIO_RECONFIG,
+	SEEK = 20,
+	PLAYBACK_RESTART,
+	PROPERTY_CHANGE,
+	QUEUE_OVERFLOW = 24,
+	HOOK
 }
 
 enum MpvLogLevel : const CInt
 {
-    NONE  = 0,
-    FATAL = 10,
-    ERROR = 20,
-    WARN  = 30,
-    INFO  = 40,
-    V     = 50,
-    DEBUG = 60,
-    TRACE = 70,
+	NONE  = 0,
+	FATAL = 10,
+	ERROR = 20,
+	WARN  = 30,
+	INFO  = 40,
+	V     = 50,
+	DEBUG = 60,
+	TRACE = 70,
 }
 
+fn ZString MpvLogLevel.to_zstr(self)
+{
+	switch (self)
+	{
+		case NONE: return "no";
+		case FATAL: return "fatal";
+		case ERROR: return "error";
+		case WARN: return "warn";
+		case INFO: return "info";
+		case V: return "v";
+		case DEBUG: return "debug";
+		case TRACE: return "trace";
+		default: unreachable("invalid MpvLogLevel: %s", self);
+	}
+}
