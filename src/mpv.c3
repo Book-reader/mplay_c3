@@ -49,7 +49,7 @@ fn void? hook_continue(Mpv ctx, ulong id) => wrap_err(mpv_hook_continue(ctx, id)
 
 
 // Sending commands to MPV
-fn void? load_file(Mpv ctx, String file_name) => command(ctx, {"loadfile", file_name});
+fn void? load_file(Mpv ctx, String file_name, bool replace) => command(ctx, {"loadfile", file_name, replace ? "replace" : "append"});
 
 fn void? load_playlist(Mpv ctx, String file_name, bool replace) => command(ctx, {"loadlist", file_name, replace ? "replace" : "append"});
 

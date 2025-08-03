@@ -13,25 +13,41 @@ fn int main(String[] args)
 	// mpv.set_option("video", FLAG, &&MpvBool.FALSE);
 	mpv.set_option_flag("video", false)!!;
 
-	mpv.set_option_string("input-default-bindings", "yes")!!;
-	mpv.set_option_string("input-vo-keyboard", "yes")!!;
-
-	// mpv.set_option("osc", FLAG, &&MpvBool.TRUE);
-	mpv.set_option_flag("osc", true)!!;
-
 	mpv.init()!!;
-	mpv::set_wakeup_callback(mpv, &on_wakeup, null);
 	// (void)mpv::request_log_messages(mpv, V);
 
-	// mpv::command(mpv, {"loadfile", args[1]})!!;
-	if (args[1][^5..] == ".m3u")
+	bool shuffle;
+	usz volume = 100;
+	for (usz i = 1; i < args.len; i++)
 	{
-		mpv::load_playlist(mpv, args[1], true)!!;
+		if (args[i] == "-s") shuffle = true;
+		if (args[i] == "-v")
+		{
+			usz? vol = args[i + 1].to_ulong();
+			if (catch err = vol)
+			{
+				io::eprintfn("ERROR: unable to parse volume '%s' to int: %s", args[i + 1], err);
+				return 1;
+			}
+			if (vol > 100)
+			{
+				io::eprintfn("ERROR: volume must be <= 100");
+				return 1;
+			}
+			volume = vol;
+		}
+		if (args[i].len > 4 && args[i][^5..] == ".m3u")
+		{
+			mpv::load_playlist(mpv, args[i], false)!!;
+		}
+		else
+		{
+			mpv::load_file(mpv, args[i], false)!!;
+		}
 	}
-	else
-	{
-		mpv::load_file(mpv, args[1])!!;
-	}
+	if (shuffle) mpv::shuffle(mpv)!!;
+	mpv.set_song_idx(0)!!;
+
 
 	mpv.observe_prop("pause", FLAG, 0)!!;
 
@@ -153,7 +169,3 @@ fn int main(String[] args)
 fn bool? Mpv.is_paused(self) => self.get_prop_flag("pause");
 fn void? Mpv.toggle_pause(self) => self.set_prop_flag("pause", !self.get_prop_flag("pause"))!;
 
-fn void on_wakeup(void* data)
-{
-	io::printn("event callback!");
-}
