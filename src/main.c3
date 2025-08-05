@@ -79,7 +79,7 @@ fn int main(String[] args)
 			}
 			volume = vol;
 		}
-		else if (args[i].len > 4 && args[i][^5..] == ".m3u")
+		else if (args[i].len > 4 && args[i][^4..] == ".m3u")
 		{
 			mpv::load_playlist(mpv, args[i], false)!!;
 		}
@@ -101,6 +101,7 @@ fn int main(String[] args)
 		// io::printfn("main got event: %s", event.name());
 		if (event.event_id == SHUTDOWN)
 		{
+			// TODO: if I run terminate_destroy before this it might wait for the output thread to finish
 			running.store(false);
 			// Done by an earlier defer
 			// mpv.terminate_destroy();
@@ -243,6 +244,9 @@ fn int output_thread_fn(ThreadData* args) => @pool_init(mem, 1 * mem::MB)
 						io::printfn("got observed property '%s'", p.name);
 				}
 			case FILE_LOADED:
+				if (song_name.ptr != DEFAULT_SONG_NAME.ptr) mpv::free(song_name);
+				if (artist_name.ptr != DEFAULT_ARTIST_NAME.ptr) mpv::free(artist_name);
+
 				song_len = output_mpv.get_prop_int("duration") ?? -1;
 				song_name = output_mpv.get_prop_string("metadata/by-key/title") ?? output_mpv.get_prop_string("filename/no-ext") ?? DEFAULT_SONG_NAME;
 				artist_name = output_mpv.get_prop_string("metadata/by-key/artist") ?? DEFAULT_ARTIST_NAME;
@@ -250,8 +254,6 @@ fn int output_thread_fn(ThreadData* args) => @pool_init(mem, 1 * mem::MB)
 				playlist_len = output_mpv.get_prop_int("playlist/count") ?? -1;
 				playlist_idx = output_mpv.get_prop_int("playlist-pos-1") ?? -1;
 			case END_FILE:
-				if (song_name.ptr != DEFAULT_SONG_NAME.ptr) mpv::free(song_name);
-				if (artist_name.ptr != DEFAULT_ARTIST_NAME.ptr) mpv::free(artist_name);
 
 				MpvEventEndFile* e = event.get_end_file();
 				if (e.error != SUCCESS) io::printfn("Ended file with error: %s", e.error);
