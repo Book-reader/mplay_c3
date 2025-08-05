@@ -1,7 +1,7 @@
 module mpv;
 // See https://github.com/mpv-player/mpv/blob/master/include/mpv/client.h for documentation on each function
 // https://mpv.io/manual/stable/#properties and https://mpv.io/manual/stable/#options lists runtime options that can be set by `set_prop` and `set_option` respectively
-// https://mpv.io/manual/stable/#commands has a list of commands that can be sent by `command` and the other command functions
+// https://mpv.io/manual/stable/#list-of-input-commands has a list of commands that can be sent by `command` and the other command functions
 macro ZString[] to_zstr_slice(String[] strs) @private
 {
 	ZString[] zstrs = mem::temp_array(ZString, strs.len + 1);
@@ -46,6 +46,22 @@ fn void? hook_add(Mpv ctx, MpvUserdata reply_userdata, String name, CInt priorit
 }
 
 fn void? hook_continue(Mpv ctx, ulong id) => wrap_err(mpv_hook_continue(ctx, id));
+
+/*fn void? observe_prop(Mpv ctx, String prop, MpvFormat format) => @pool()
+{
+	return wrap_err(mpv_observe_property(ctx, (MpvUserdata)prop.hash(), prop.zstr_tcopy(), format));
+}
+
+fn CInt? unobserve_prop(Mpv ctx, String prop)
+{
+	MpvError ret = mpv_unobserve_property(ctx, (MpvUserdata)prop.hash());
+	return ret < 0 ? @catch(wrap_err(ret))? : (CInt)ret;
+}
+
+fn void? del_prop(Mpv ctx, String name) => @pool()
+{
+	return wrap_err(mpv_del_property(ctx, name.zstr_tcopy()));
+}*/
 
 
 // Sending commands to MPV
@@ -138,7 +154,7 @@ fn void? Mpv.set_option(self, String option, MpvFormat format, void* value) => @
 	return wrap_err(mpv_set_option(self, option.zstr_tcopy(), format, value));
 }
 
-
+// TODO: would these be better as 'mpv::observe_prop(mpv, ...)'?
 fn void? Mpv.observe_prop(self, String prop, MpvFormat format, MpvUserdata reply_userdata) => @pool()
 {
 	return wrap_err(mpv_observe_property(self, reply_userdata, prop.zstr_tcopy(), format));
@@ -277,3 +293,24 @@ fn MpvNode? MpvEvent.to_node(&self)
 	wrap_err(mpv_event_to_node(&n, self))!;
 	return n;
 }
+
+<*
+ @require self.format == INT64
+*>
+fn long MpvEventProperty.get_int(&self) => *(long*)self.data;
+
+<*
+ @require self.format == FLAG
+*>
+fn bool MpvEventProperty.get_flag(&self) => ((MpvBool*)self.data).as_bool;
+
+<*
+ @require self.format == DOUBLE
+*>
+fn double MpvEventProperty.get_double(&self) => *(double*)self.data;
+
+<*
+ @require self.format == STRING
+*>
+fn String MpvEventProperty.get_string(&self) => ((ZString)self.data).str_view();
+

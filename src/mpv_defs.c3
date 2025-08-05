@@ -8,7 +8,6 @@ faultdef EVENT_QUEUE_FULL, NOMEM, UNINITIALIZED, INVALID_PARAMETER,
 		VO_INIT_FAILED, NOTHING_TO_PLAY, UNKNOWN_FORMAT, UNSUPPORTED,
 		NOT_IMPLEMENTED, GENERIC;
 
-typedef MpvError = CInt;
 typedef Mpv = void*;
 typedef MpvUserdata = ulong;
 
@@ -143,7 +142,7 @@ enum MpvFormat : CInt
 	BYTE_ARRAY,
 }
 
-enum MpvEndFileReason : const CInt
+enum MpvEndFileReason (Printable) : const CInt
 {
 	EOF = 0,
 	STOP = 2,
@@ -152,65 +151,78 @@ enum MpvEndFileReason : const CInt
 	REDIRECT = 5,
 }
 
+fn String MpvEndFileReason.to_constant_string(&self, Formatter* fmt) @dynamic
+{
+	switch (*self)
+	{
+		case EOF: return "EOF";
+		case STOP: return "STOP";
+		case QUIT: return "QUIT";
+		case ERROR: return "ERROR";
+		case REDIRECT: return "REDIRECT";
+		default: return "UNKNOWN";
+	}
+}
+
 macro void? wrap_err(MpvError val) @private
 {
 	switch (val)
 	{
-		case 0: return;
-		case -1: return EVENT_QUEUE_FULL?;
-		case -2: return NOMEM?;
-		case -3: return UNINITIALIZED?;
-		case -4: return INVALID_PARAMETER?;
-		case -5: return OPTION_NOT_FOUND?;
-		case -6: return OPTION_FORMAT?;
-		case -7: return OPTION_ERROR?;
-		case -8: return PROPERTY_NOT_FOUND?;
-		case -9: return PROPERTY_FORMAT?;
-		case -10: return PROPERTY_UNAVAILABLE?;
-		case -11: return PROPERTY_ERROR?;
-		case -12: return COMMAND?;
-		case -13: return LOADING_FAILED?;
-		case -14: return AO_INIT_FAILED?;
-		case -15: return VO_INIT_FAILED?;
-		case -16: return NOTHING_TO_PLAY?;
-		case -17: return UNKNOWN_FORMAT?;
-		case -18: return UNSUPPORTED?;
-		case -19: return NOT_IMPLEMENTED?;
-		case -20: return GENERIC?;
+		case SUCCESS: return;
+		case EVENT_QUEUE_FULL: return EVENT_QUEUE_FULL?;
+		case NOMEM: return NOMEM?;
+		case UNINITIALIZED: return UNINITIALIZED?;
+		case INVALID_PARAMETER: return INVALID_PARAMETER?;
+		case OPTION_NOT_FOUND: return OPTION_NOT_FOUND?;
+		case OPTION_FORMAT: return OPTION_FORMAT?;
+		case OPTION_ERROR: return OPTION_ERROR?;
+		case PROPERTY_NOT_FOUND: return PROPERTY_NOT_FOUND?;
+		case PROPERTY_FORMAT: return PROPERTY_FORMAT?;
+		case PROPERTY_UNAVAILABLE: return PROPERTY_UNAVAILABLE?;
+		case PROPERTY_ERROR: return PROPERTY_ERROR?;
+		case COMMAND: return COMMAND?;
+		case LOADING_FAILED: return LOADING_FAILED?;
+		case AO_INIT_FAILED: return AO_INIT_FAILED?;
+		case VO_INIT_FAILED: return VO_INIT_FAILED?;
+		case NOTHING_TO_PLAY: return NOTHING_TO_PLAY?;
+		case UNKNOWN_FORMAT: return UNKNOWN_FORMAT?;
+		case UNSUPPORTED: return UNSUPPORTED?;
+		case NOT_IMPLEMENTED: return NOT_IMPLEMENTED?;
+		case GENERIC: return GENERIC?;
 		default:// return (CInt)val;
 			unreachable("Invalid MPV error code");
 	}
 }
 
-fn ZString error_string(fault err) @inline
+fn String error_string(fault err) @inline
 {
 	MpvError err_val;
 	switch (err)
 	{
-		case EVENT_QUEUE_FULL: err_val = -1;
-		case NOMEM: err_val = -2;
-		case UNINITIALIZED: err_val = -3;
-		case INVALID_PARAMETER: err_val = -4;
-		case OPTION_NOT_FOUND: err_val = -5;
-		case OPTION_FORMAT: err_val = -6;
-		case OPTION_ERROR: err_val = -7;
-		case PROPERTY_NOT_FOUND: err_val = -8;
-		case PROPERTY_FORMAT: err_val = -9;
-		case PROPERTY_UNAVAILABLE: err_val = -10;
-		case PROPERTY_ERROR: err_val = -11;
-		case COMMAND: err_val = -12;
-		case LOADING_FAILED: err_val = -13;
-		case AO_INIT_FAILED: err_val = -14;
-		case VO_INIT_FAILED: err_val = -15;
-		case NOTHING_TO_PLAY: err_val = -16;
-		case UNKNOWN_FORMAT: err_val = -17;
-		case UNSUPPORTED: err_val = -18;
-		case NOT_IMPLEMENTED: err_val = -19;
-		case GENERIC: err_val = -20;
+		case EVENT_QUEUE_FULL: err_val = EVENT_QUEUE_FULL;
+		case NOMEM: err_val = NOMEM;
+		case UNINITIALIZED: err_val = UNINITIALIZED;
+		case INVALID_PARAMETER: err_val = INVALID_PARAMETER;
+		case OPTION_NOT_FOUND: err_val = OPTION_NOT_FOUND;
+		case OPTION_FORMAT: err_val = OPTION_FORMAT;
+		case OPTION_ERROR: err_val = OPTION_ERROR;
+		case PROPERTY_NOT_FOUND: err_val = PROPERTY_NOT_FOUND;
+		case PROPERTY_FORMAT: err_val = PROPERTY_FORMAT;
+		case PROPERTY_UNAVAILABLE: err_val = PROPERTY_UNAVAILABLE;
+		case PROPERTY_ERROR: err_val = PROPERTY_ERROR;
+		case COMMAND: err_val = COMMAND;
+		case LOADING_FAILED: err_val = LOADING_FAILED;
+		case AO_INIT_FAILED: err_val = AO_INIT_FAILED;
+		case VO_INIT_FAILED: err_val = VO_INIT_FAILED;
+		case NOTHING_TO_PLAY: err_val = NOTHING_TO_PLAY;
+		case UNKNOWN_FORMAT: err_val = UNKNOWN_FORMAT;
+		case UNSUPPORTED: err_val = UNSUPPORTED;
+		case NOT_IMPLEMENTED: err_val = NOT_IMPLEMENTED;
+		case GENERIC: err_val = GENERIC;
 		default:
 			unreachable("Not an MPV error: %s", err);
 	}
-	return mpv_error_string(err_val);
+	return mpv_error_string(err_val).str_view();
 }
 
 enum MpvEventId : const CInt
@@ -261,3 +273,30 @@ fn ZString MpvLogLevel.to_zstr(self)
 		default: unreachable("invalid MpvLogLevel: %s", self);
 	}
 }
+
+enum MpvError (Printable) : const CInt
+{
+	SUCCESS           = 0,
+	EVENT_QUEUE_FULL  = -1,
+	NOMEM             = -2,
+	UNINITIALIZED     = -3,
+	INVALID_PARAMETER = -4,
+	OPTION_NOT_FOUND  = -5,
+	OPTION_FORMAT     = -6,
+	OPTION_ERROR      = -7,
+	PROPERTY_NOT_FOUND = -8,
+	PROPERTY_FORMAT   = -9,
+	PROPERTY_UNAVAILABLE = -10,
+	PROPERTY_ERROR    = -11,
+	COMMAND           = -12,
+	LOADING_FAILED    = -13,
+	AO_INIT_FAILED    = -14,
+	VO_INIT_FAILED    = -15,
+	NOTHING_TO_PLAY   = -16,
+	UNKNOWN_FORMAT    = -17,
+	UNSUPPORTED       = -18,
+	NOT_IMPLEMENTED   = -19,
+	GENERIC           = -20
+}
+
+fn String MpvError.to_constant_string(&self) @dynamic => mpv_error_string(*self).str_view();
