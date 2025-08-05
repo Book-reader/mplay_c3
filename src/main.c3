@@ -308,8 +308,8 @@ fn int output_thread_fn(ThreadData* args) => @pool_init(mem, 10 * mem::MB)
 		io::printfn("%s by %s", song_name, artist_name);
 		const PROGRESS_BAR_WIDTH = 40 - 1;
 		// Don't worry about how it works, I can't really remember anyway
-		usz time_progress = (double)song_secs / song_len * PROGRESS_BAR_WIDTH;
-		io::printfn("%s:%02d/%s:%02d [%.*s>%.*s]", song_secs / 60, song_secs % 60, song_len / 60, song_len % 60, time_progress, @repeat("-", PROGRESS_BAR_WIDTH), PROGRESS_BAR_WIDTH - time_progress, @repeat(" ", PROGRESS_BAR_WIDTH));
+		usz time_progress = (usz)((double)song_secs / song_len * PROGRESS_BAR_WIDTH);
+		io::printfn("%s:%02d/%s:%02d [%s%.*s>%.*s%s]", song_secs / 60, song_secs % 60, song_len / 60, song_len % 60, Ansi.GREEN, time_progress, @repeat("-", PROGRESS_BAR_WIDTH), PROGRESS_BAR_WIDTH - time_progress, @repeat(" ", PROGRESS_BAR_WIDTH), Ansi.RESET);
 		io::printfn("[%s/%s] %s %s%%", playlist_idx, playlist_len, pause ? "►" : "⏸︎", volume);
 		cursor_horizontal_position(0);
 		cursor_up(3);
