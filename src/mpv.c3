@@ -65,14 +65,14 @@ fn void? del_prop(Mpv ctx, String name) => @pool()
 
 
 // Sending commands to MPV
-fn void? load_file(Mpv ctx, String file_name, bool replace) => command(ctx, {"loadfile", file_name, replace ? "replace" : "append"});
+fn void? load_file(Mpv ctx, String file_name, bool replace) => command(ctx, "loadfile", file_name, replace ? "replace" : "append");
 
-fn void? load_playlist(Mpv ctx, String file_name, bool replace) => command(ctx, {"loadlist", file_name, replace ? "replace" : "append"});
+fn void? load_playlist(Mpv ctx, String file_name, bool replace) => command(ctx, "loadlist", file_name, replace ? "replace" : "append");
 
-fn void? shuffle(Mpv ctx) => command(ctx, {"playlist-shuffle"});
-fn void? unshuffle(Mpv ctx) => command(ctx, {"playlist-unshuffle"});
+fn void? shuffle(Mpv ctx) => command(ctx, "playlist-shuffle");
+fn void? unshuffle(Mpv ctx) => command(ctx, "playlist-unshuffle");
 
-fn void? command(Mpv ctx, String[] args) => @pool()
+fn void? command(Mpv ctx, String... args) => @pool()
 {
 	return wrap_err(mpv_command(ctx, to_zstr_slice(args)));
 }
@@ -84,19 +84,19 @@ fn MpvNode? command_node(Mpv ctx, MpvNode* args)
 	return result;
 }
 
-fn MpvNode? command_ret(Mpv ctx, String[] args) => @pool()
+fn MpvNode? command_ret(Mpv ctx, String... args) => @pool()
 {
 	MpvNode result;
 	wrap_err(mpv_command_ret(ctx, to_zstr_slice(args), &result))!;
 	return result;
 }
 
-fn void? command_string(Mpv ctx, String[] args) => @pool()
+fn void? command_string(Mpv ctx, String... args) => @pool()
 {
 	return wrap_err(mpv_command_string(ctx, to_zstr_slice(args)));
 }
 
-fn void? command_async(Mpv ctx, MpvUserdata reply_userdata, String[] args) => @pool()
+fn void? command_async(Mpv ctx, MpvUserdata reply_userdata, String... args) => @pool()
 {
 	return wrap_err(mpv_command_async(ctx, reply_userdata, to_zstr_slice(args)));
 }

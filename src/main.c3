@@ -23,7 +23,7 @@ fn int main(String[] args)
 	running.store(true);
 
 	Mpv mpv = mpv::create();
-	defer mpv.destroy();
+	defer mpv.terminate_destroy();
 
 	// mpv.set_option("video", FLAG, &&MpvBool.FALSE);
 	mpv.set_option_flag("video", false)!!;
@@ -90,154 +90,111 @@ fn int main(String[] args)
 	}
 	if (shuffle) mpv::shuffle(mpv)!!;
 	mpv.set_song_idx(0)!!;
+	(void)mpv.set_prop_int("volume", volume);
 
 	(void)mpv.unpause();
 	// mpv.observe_prop("pause", FLAG, 0)!!;
 
 	while (running.load())
 	{
-		MpvEvent *event = mpv::wait_event(mpv, 1.0);
+		MpvEvent *event = mpv::wait_event(mpv, 10.0);
+		// io::printfn("main got event: %s", event.name());
+		if (event.event_id == SHUTDOWN)
+		{
+			running.store(false);
+			// Done by an earlier defer
+			// mpv.terminate_destroy();
+		}
 	}
-
-/*	rl::initWindow(500, 200, "Mpv client");
-	defer rl::closeWindow();
-	rl::setTargetFPS(30);
-
-	while (!rl::windowShouldClose())
-	{
-		MpvEvent* event = mpv::wait_event(mpv, 0);
-		switch (event.event_id)
-		{
-			case NONE:
-				break;
-			case SHUTDOWN:
-				break;
-			case PROPERTY_CHANGE:
-				MpvEventProperty* p = event.get_property_change();
-				// pause event only. 0 is set by observe_property call above
-				if (event.reply_userdata == 0)
-				{
-					 io::printfn("property %s changed to %s", p.name, *(MpvBool*)p.data);
-				}
-				else
-				{
-					nextcase default;
-				}
-			default:
-				io::printfn("got event %s", event.name());
-		}
-
-		if (rl::isKeyPressed(rl::KEY_SPACE))
-		{
-			mpv.toggle_pause()!!;
-		}
-		if (rl::isKeyPressed(rl::KEY_A))
-		{
-			mpv::shuffle(mpv)!!;
-			mpv.set_song_idx(0)!!;
-		}
-		if (rl::isKeyPressed(rl::KEY_B))
-		{
-			mpv::unshuffle(mpv)!!;
-			mpv.set_song_idx(0)!!;
-		}
-		if (rl::isKeyPressed(rl::KEY_M))
-		{
-			mpv.set_prop_flag("mute", !mpv.get_prop_flag("mute"))!!;
-		}
-		if (rl::isKeyDown(rl::KEY_UP))
-		{
-			if (try vol = mpv.get_prop_int("volume") && vol < 100)
-			{
-				(void)mpv.set_prop_int("volume", vol + 5);
-			}
-		}
-		if (rl::isKeyDown(rl::KEY_DOWN))
-		{
-			if (try vol = mpv.get_prop_int("volume") && vol > 0)
-			{
-				(void)mpv.set_prop_int("volume", vol - 5);
-			}
-		}
-		if (rl::isKeyPressed(rl::KEY_RIGHT))
-		{
-			if (try sec = mpv.get_prop_int("time-pos"))
-			{
-				(void)mpv.set_prop_int("time-pos", sec + 5);
-			}
-		}
-		if (rl::isKeyPressed(rl::KEY_LEFT))
-		{
-			if (try sec = mpv.get_prop_int("time-pos"))
-			{
-				(void)mpv.set_prop_int("time-pos", sec - 5);
-			}
-		}
-		if (rl::isMouseButtonPressed(LEFT))
-		{
-			float[<2>] pos = bitcast(rl::getMousePosition(), float[<2>]);
-			if (pos.comp_lt({410, 70}) == {true, true} && pos.comp_gt({10, 50}) == {true, true})
-			{
-				(void)mpv.set_prop_int("time-pos", (long)(((pos.x - 10) / 400) * mpv.get_prop_int("duration") ?? 0));
-			}
-		}
-		rl::@drawing()
-		{
-			rl::clearBackground(rl::RAYWHITE);
-			rl::drawText((mpv.is_paused() ?? true) ? "|>" : "||", 10, 10, 40, rl::BLACK);
-			rl::drawRectangle(10, 50, 400, 20, rl::BLACK);
-			rl::drawRectangle(12, 52, (int)(396 * ((mpv.get_prop_int("percent-pos") ?? 0) / 100.0)), 16, rl::WHITE);
-			@pool()
-			{
-				String? title = mpv.get_prop_string("metadata/by-key/title");
-				defer if (try title) mpv::free(title);
-				rl::drawText((title ?? "Unknown").zstr_tcopy(), 10, 80, 40, rl::BLACK);
-
-				rl::drawText(string::tformat_zstr("%s/%s", time::sec(mpv.get_prop_int("time-pos") ?? 0).to_nano(), time::sec(mpv.get_prop_int("duration") ?? 0).to_nano()), 380, 70, 20, rl::BLACK);
-
-				if (mpv.get_prop_flag("mute") ?? false)
-				{
-					rl::drawText("Muted", 380, 20, 20, rl::BLACK);
-				}
-				else
-				{
-					rl::drawText(string::tformat_zstr("Vol: %s%%", mpv.get_prop_int("volume") ?? 0), 380, 20, 20, rl::BLACK);
-				}
-				rl::drawText(string::tformat_zstr("%s/%s", mpv.get_prop_int("playlist-pos-1") ?? -1, mpv.get_prop_int("playlist/count") ?? -1), 40, 20, 20, rl::BLACK);
-			};
-		};
-	}
-*/
 	return 0;
 }
 
-fn int input_thread_fn(ThreadData* args) => @pool_init(mem, 10 * mem::MB)
+import libc::termios;
+Termios inital_termios;
+fn void enable_raw_mode()
+{
+	CInt stdin = io::stdin().fd();
+	Termios raw;
+	raw.get_attr(stdin);
+	inital_termios = raw;
+	raw.c_lflag &= ~(Tc_lflags){.echo, .icanon};
+	raw.set_attr(stdin, TCSAFLUSH);
+}
+
+fn void disable_raw_mode() @finalizer
+{
+	inital_termios.set_attr(io::stdin().fd(), TCSAFLUSH);
+	// io::printfn("\n12345\n");
+}
+
+fn int input_thread_fn(ThreadData* args) => @pool_init(mem, 1 * mem::MB)
 {
 	Atomic {bool}* running = args.running;
 	Mpv mpv = args.mpv;
-	while (running.load()) @pool()
+	enable_raw_mode();
+	defer disable_raw_mode();
+	while (running.load())
 	{
-		thread::sleep(time::sec(1));
-/*		static int i;
-		switch (i % 4)
+		char? c = io::stdin().read_byte();
+		if (catch err = c)
 		{
-			case 0:
-				cursor_up(5);
-			case 1:
-				cursor_left(5);
-			case 2:
-				cursor_down(5);
-			case 3:
-				cursor_right(5);
+			mpv::command(mpv, "quit")!!;
+			io::printfn("failed to read from stdin: %s", err);
+			return 1;
 		}
-		i++;*/
-		// if (running.load()) mpv::command(mpv, {"seek", "100", "absolute-percent"})!!;
-		// mpv.toggle_pause()!!;
-	};
+//		io::printfn("read '%c'", c);
+		if (c == 'q')
+		{
+			mpv::command(mpv, "quit")!!;
+			return 0;
+		}
+		else if (c == ' ')
+		{
+			(void)mpv.toggle_pause();
+		}
+		else if (c == 'm')
+		{
+			(void)mpv.set_prop_flag("mute", !mpv.get_prop_flag("mute") ?? true);
+		}
+		else if (c == '\e')
+		{
+			c = io::stdin().read_byte()!!;
+			if (c == '[')
+			{
+				const VOL_STEP = 5;
+				const MIN_SKIP_START = 3;
+				c = io::stdin().read_byte()!!;
+				switch (c)
+				{
+					case 'A': // up
+						long vol = mpv.get_prop_int("volume") ?? 0;
+						if (vol < 100) (void)mpv.set_prop_int("volume", min(vol + VOL_STEP, 100));
+					case 'B': // down
+						long vol = mpv.get_prop_int("volume") ?? 0;
+						if (vol > 0) (void)mpv.set_prop_int("volume", max(vol - VOL_STEP, 0));
+					case 'C': // right
+						(void)mpv::command(mpv, "playlist-next");
+					case 'D': // left
+						long pos = mpv.get_prop_int("time-pos") ?? 0;
+						if (pos < MIN_SKIP_START)
+						{
+							(void)mpv::command(mpv, "playlist-prev");
+						}
+						else
+						{
+							(void)mpv::command(mpv, "seek", "0", "absolute");
+						}
+				}
+			}
+			
+			// io::printfn("a");
+		}
+		// io::printfn("%d:'%c'", c, c.is_print() ? c : '-');
+	}
 	return 0;
 }
 
-fn int output_thread_fn(ThreadData* args) => @pool_init(mem, 10 * mem::MB)
+fn int output_thread_fn(ThreadData* args) => @pool_init(mem, 1 * mem::MB)
 {
 	Atomic {bool}* running = args.running;
 	Mpv output_mpv = mpv::create_client(args.mpv, "output");
@@ -245,6 +202,7 @@ fn int output_thread_fn(ThreadData* args) => @pool_init(mem, 10 * mem::MB)
 	output_mpv.observe_prop("time-pos", INT64, 0)!!;
 	output_mpv.observe_prop("pause", FLAG, 1)!!;
 	output_mpv.observe_prop("volume", INT64, 2)!!;
+	output_mpv.observe_prop("mute", FLAG, 3)!!;
 
 	const DEFAULT_SONG_NAME = "Unknown";
 	const DEFAULT_ARTIST_NAME = "Unknown";
@@ -256,6 +214,7 @@ fn int output_thread_fn(ThreadData* args) => @pool_init(mem, 10 * mem::MB)
 	long song_secs = -1;
 	long volume = -1;
 	bool pause = true;
+	bool mute = false;
 
 	// cursor_horizontal_position(0);
 	// save_cursor();
@@ -278,6 +237,8 @@ fn int output_thread_fn(ThreadData* args) => @pool_init(mem, 10 * mem::MB)
 						song_secs = p.get_int();
 					case p.name == "volume":
 						volume = p.get_int();
+					case p.name == "mute":
+						mute = p.get_flag();
 					default:
 						io::printfn("got observed property '%s'", p.name);
 				}
@@ -289,17 +250,25 @@ fn int output_thread_fn(ThreadData* args) => @pool_init(mem, 10 * mem::MB)
 				playlist_len = output_mpv.get_prop_int("playlist/count") ?? -1;
 				playlist_idx = output_mpv.get_prop_int("playlist-pos-1") ?? -1;
 			case END_FILE:
+				if (song_name.ptr != DEFAULT_SONG_NAME.ptr) mpv::free(song_name);
+				if (artist_name.ptr != DEFAULT_ARTIST_NAME.ptr) mpv::free(artist_name);
+
 				MpvEventEndFile* e = event.get_end_file();
 				if (e.error != SUCCESS) io::printfn("Ended file with error: %s", e.error);
 				switch (e.reason)
 				{
+					case QUIT:
 					case EOF:
+					case STOP:
 						break;
 					default:
 						io::printfn("end file with reason '%s', error: '%s'", e.reason, e.error);
 				}
 			case SHUTDOWN:
-				running.store(false);
+				// running.store(false);
+				// Done by an earlier defer
+				// output_mpv.destroy();
+				return 0;
 			default:
 				// io::printfn("Got event: %s", event.name());
 		}
@@ -307,12 +276,16 @@ fn int output_thread_fn(ThreadData* args) => @pool_init(mem, 10 * mem::MB)
 		clear_display(CURSOR_TO_END);
 		io::printfn("%s by %s", song_name, artist_name);
 		const PROGRESS_BAR_WIDTH = 40 - 1;
-		// Don't worry about how it works, I can't really remember anyway
 		usz time_progress = (usz)((double)song_secs / song_len * PROGRESS_BAR_WIDTH);
+		// Don't worry about how it works, I can't really remember anyway
 		io::printfn("%s:%02d/%s:%02d [%s%.*s>%.*s%s]", song_secs / 60, song_secs % 60, song_len / 60, song_len % 60, Ansi.GREEN, time_progress, @repeat("-", PROGRESS_BAR_WIDTH), PROGRESS_BAR_WIDTH - time_progress, @repeat(" ", PROGRESS_BAR_WIDTH), Ansi.RESET);
-		io::printfn("[%s/%s] %s %s%%", playlist_idx, playlist_len, pause ? "►" : "⏸︎", volume);
+		@pool()
+		{
+			io::printfn("[%s/%s] %s %s", playlist_idx, playlist_len, pause ? "►" : "⏸︎", mute ? "Muted" : string::tformat("%s%%", volume));
+		};
 		cursor_horizontal_position(0);
 		cursor_up(3);
+
 	}
 	return 0;
 }
