@@ -1,0 +1,3 @@
+[submodule "lib/libmpv.c3l"]
+	path = lib/libmpv.c3l
+	url = https://github.com/Book-reader/libmpv.c3l.git
